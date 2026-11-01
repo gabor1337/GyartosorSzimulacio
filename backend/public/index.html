@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gyártósor felügyelet</title>
+    <link rel="stylesheet" href="style.css">
+    
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div>
+                <p class="eyebrow">IPARI FELÜGYELETI RENDSZER</p>
+                <h1>Gyártósor felügyelet</h1>
+                <p class="subtitle">ESP32-S3 alapú gyártósor-szimuláció</p>
+            </div>
+            <div class="connection">
+                <span id="connectionIndicator" class="indicator offline"></span>
+                <span id="connectionText">Kapcsolódás...</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="dashboard-grid">
+                <div class="card status-card">
+                    <p class="card-label">GÉPÁLLAPOT</p>
+                    <h2 id="machineStatus" class="status-value">ISMERETLEN</h2>
+                    <p id="statusDescription" class="card-description">
+                        Várakozás az adatokra...
+                    </p>
+                </div>
+
+                <div class="card production-card">
+                    <p class="card-label">LEGYÁRTOTT DARABOK</p>
+                    <h2 id="productionCount" class="production-value">0</h2>
+                    <p class="card-description">Összesített termelés</p>
+                </div>
+            </section>
+
+            <section class="card control-card">
+                <div class="section-heading">
+                    <div>
+                        <h2>Gépvezérlés</h2>
+                        <p class="card-description">
+                            A gyártósor távoli vezérlése
+                        </p>
+                    </div>
+                </div>
+
+                <div class="control-grid">
+                    <button id="startButton" class="control-button start">
+                        START
+                    </button>
+
+                    <button id="stopButton" class="control-button stop">
+                        STOP
+                    </button>
+
+                    <button id="resetButton" class="control-button reset">
+                        RESET
+                    </button>
+
+                    <button id="emergencyButton" class="control-button emergency">
+                        VÉSZLEÁLLÍTÁS
+                    </button>
+                </div>
+
+                <p id="commandMessage" class="command-message">
+                    Válassz egy vezérlőparancsot.
+                </p>
+            </section>
+
+            <section class="information-grid">
+                <div class="card">
+                    <h2>Kommunikáció</h2>
+
+                    <div class="info-row">
+                        <span>Node.js API</span>
+                        <span id="apiStatus" class="info-value">Ellenőrzés...</span>
+                    </div>
+
+                    <div class="info-row">
+                        <span>MQTT kapcsolat</span>
+                        <span id="mqttStatus" class="info-value">Ellenőrzés...</span>
+                    </div>
+
+                    <div class="info-row">
+                        <span>Utolsó adatfrissítés</span>
+                        <span id="lastUpdate" class="info-value">-</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Utolsó esemény</h2>
+                    <p id="lastEvent" class="event-value">Még nem érkezett esemény.</p>
+                    <p id="lastEventTime" class="card-description">-</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Gyártósor-felügyeleti rendszer | ESP32-S3 | MQTT | Node.js | Supabase</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>

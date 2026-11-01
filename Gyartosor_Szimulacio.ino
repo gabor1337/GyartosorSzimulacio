@@ -1,30 +1,33 @@
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <string.h>
 #include "secrets.h"
 
+// Wi-Fi konfiguráció
 const char* WIFI_SSID = SECRET_WIFI_SSID;
 const char* WIFI_PASSWORD = SECRET_WIFI_PASSWORD;
 const char* MQTT_SERVER = SECRET_MQTT_SERVER;
 
 const int MQTT_PORT = 1883;
 
-
-// MQTT temak
+// MQTT témakörök
 const char* TOPIC_STATUS = "gyartosor/esp32/status";
 const char* TOPIC_EVENT = "gyartosor/esp32/event";
+const char* TOPIC_COMMAND = "gyartosor/esp32/command";
 
-// LED-ek
+// LED-ek GPIO-kiosztása
 const int GREEN_LED = 17;
 const int YELLOW_LED = 16;
 const int RED_LED = 4;
 
-// Gombok
+// Fizikai gombok GPIO-kiosztása
 const int START_BUTTON = 15;
 const int RESET_BUTTON = 7;
 const int STOP_BUTTON = 6;
 const int EMERGENCY_BUTTON = 5;
 
+// Gyártósor állapotai
 enum MachineState {
   STOPPED,
   RUNNING,
@@ -33,22 +36,43 @@ enum MachineState {
 
 MachineState machineState = STOPPED;
 
+// Webes parancsok
+enum RemoteCommand {
+  NO_COMMAND,
+  REMOTE_START,
+  REMOTE_STOP,
+  REMOTE_RESET,
+  REMOTE_EMERGENCY_STOP
+};
+
+RemoteCommand pendingCommand = NO_COMMAND;
+
+// Wi-Fi és MQTT objektumok
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+// Időzítők
 unsigned long lastProductionTime = 0;
 unsigned long lastStatusTime = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMQTTAttempt = 0;
 
+// Időintervallumok
 const unsigned long PRODUCTION_INTERVAL = 2000;
 const unsigned long DEBOUNCE_TIME = 40;
 const unsigned long STATUS_INTERVAL = 5000;
 const unsigned long RECONNECT_INTERVAL = 3000;
 
+// Gombok pergésmentesítése
 unsigned long lastChange[4] = {0, 0, 0, 0};
-bool lastReading[4] = {HIGH, HIGH, HIGH, HIGH};
-bool stableState[4] = {HIGH, HIGH, HIGH, HIGH};
+
+bool lastReading[4] = {
+  HIGH, HIGH, HIGH, HIGH
+};
+
+bool stableState[4] = {
+  HIGH, HIGH, HIGH, HIGH
+};
 
 const int buttonPins[4] = {
   START_BUTTON,
@@ -57,13 +81,17 @@ const int buttonPins[4] = {
   EMERGENCY_BUTTON
 };
 
+// Termelési adatok
 unsigned long totalProduced = 0;
 unsigned long messageNumber = 0;
 
+// Utoljára elküldött állapot
 MachineState lastPublishedState = STOPPED;
 unsigned long lastPublishedCount = 0;
 bool firstStatusPublished = false;
 
+
+// Fizikai gombok olvasása
 bool buttonPressed(int index) {
   bool reading = digitalRead(buttonPins[index]);
 
@@ -76,7 +104,6 @@ bool buttonPressed(int index) {
     if (reading != stableState[index]) {
       stableState[index] = reading;
 
-      // INPUT_PULLUP: LOW = lenyomott gomb
       if (stableState[index] == LOW) {
         return true;
       }
@@ -86,6 +113,8 @@ bool buttonPressed(int index) {
   return false;
 }
 
+
+// Aktuális állapot nevének lekérdezése
 const char* getStateName() {
   switch (machineState) {
     case RUNNING:
@@ -101,6 +130,8 @@ const char* getStateName() {
   return "UNKNOWN";
 }
 
+
+// LED-ek vezérlése
 void updateLEDs() {
   digitalWrite(GREEN_LED, LOW);
   digitalWrite(YELLOW_LED, LOW);
@@ -121,6 +152,8 @@ void updateLEDs() {
   }
 }
 
+
+// Wi-Fi kapcsolat kezelése
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     return;
@@ -134,11 +167,51 @@ void connectWiFi() {
 
   lastWiFiAttempt = now;
 
-  Serial.println("Wi-Fi-csatlakozasi kiserlet...");
+  Serial.println("Wi-Fi-csatlakozási kísérlet...");
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
+
+// MQTT üzenetek fogadása
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  if (strcmp(topic, TOPIC_COMMAND) != 0) {
+    return;
+  }
+
+  char message[128];
+
+  if (length >= sizeof(message)) {
+    Serial.println("Túl hosszú MQTT-parancs!");
+    return;
+  }
+
+  memcpy(message, payload, length);
+  message[length] = '\0';
+
+  Serial.print("Webes parancs érkezett: ");
+  Serial.println(message);
+
+  if (strstr(message, "\"command\":\"START\"") != nullptr) {
+    pendingCommand = REMOTE_START;
+  }
+  else if (strstr(message, "\"command\":\"STOP\"") != nullptr) {
+    pendingCommand = REMOTE_STOP;
+  }
+  else if (strstr(message, "\"command\":\"RESET\"") != nullptr) {
+    pendingCommand = REMOTE_RESET;
+  }
+  else if (strstr(message, "\"command\":\"EMERGENCY_STOP\"") != nullptr) {
+    pendingCommand = REMOTE_EMERGENCY_STOP;
+  }
+  else {
+    Serial.println("Ismeretlen webes parancs!");
+  }
+}
+
+
+// MQTT kapcsolat létrehozása
 void connectMQTT() {
   if (WiFi.status() != WL_CONNECTED ||
       mqttClient.connected()) {
@@ -153,7 +226,7 @@ void connectMQTT() {
 
   lastMQTTAttempt = now;
 
-  Serial.print("MQTT-kapcsolodas... ");
+  Serial.print("MQTT-kapcsolódás... ");
 
   String clientId = "ESP32-Gyartosor-";
   clientId += String((uint32_t)ESP.getEfuseMac(), HEX);
@@ -161,14 +234,23 @@ void connectMQTT() {
   if (mqttClient.connect(clientId.c_str())) {
     Serial.println("sikeres!");
 
-    // Uj kapcsolatnal friss allapotot kuldunk
+    if (mqttClient.subscribe(TOPIC_COMMAND)) {
+      Serial.println("Webes vezérlés MQTT-feliratkozás sikeres.");
+    }
+    else {
+      Serial.println("MQTT-feliratkozás sikertelen!");
+    }
+
     firstStatusPublished = false;
-  } else {
-    Serial.print("sikertelen, hibakod: ");
+  }
+  else {
+    Serial.print("Sikertelen, hibakód: ");
     Serial.println(mqttClient.state());
   }
 }
 
+
+// MQTT esemény küldése
 void publishEvent(const char* eventName) {
   if (!mqttClient.connected()) {
     return;
@@ -186,13 +268,16 @@ void publishEvent(const char* eventName) {
   );
 
   if (mqttClient.publish(TOPIC_EVENT, payload)) {
-    Serial.print("MQTT-esemeny: ");
+    Serial.print("MQTT-esemény: ");
     Serial.println(payload);
-  } else {
-    Serial.println("Az MQTT-esemeny kuldese sikertelen.");
+  }
+  else {
+    Serial.println("Az MQTT-esemény küldése sikertelen.");
   }
 }
 
+
+// MQTT állapot küldése
 void publishStatus(bool force = false) {
   if (!mqttClient.connected()) {
     return;
@@ -229,18 +314,21 @@ void publishStatus(bool force = false) {
   );
 
   if (mqttClient.publish(TOPIC_STATUS, payload)) {
-    Serial.print("MQTT-allapot: ");
+    Serial.print("MQTT-állapot: ");
     Serial.println(payload);
 
     lastPublishedState = machineState;
     lastPublishedCount = totalProduced;
     lastStatusTime = now;
     firstStatusPublished = true;
-  } else {
-    Serial.println("Az MQTT-allapot kuldese sikertelen.");
+  }
+  else {
+    Serial.println("Az MQTT-állapot küldése sikertelen.");
   }
 }
 
+
+// Program inicializálása
 void setup() {
   Serial.begin(115200);
 
@@ -259,17 +347,20 @@ void setup() {
 
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   mqttClient.setBufferSize(256);
+  mqttClient.setCallback(mqttCallback);
 
   Serial.println();
-  Serial.println("=== GYARTOSOR SZIMULACIO MQTT-VEL ===");
-  Serial.println("Allapot: STOPPED");
+  Serial.println("=== GYÁRTÓSOR SZIMULÁCIÓ MQTT-VEL ===");
+  Serial.println("Állapot: STOPPED");
   Serial.println("Nyomd meg a START gombot!");
+  Serial.println("A webes vezérlés is aktív.");
 
   lastWiFiAttempt = millis();
 }
 
+
+// Fő programciklus
 void loop() {
-  // Halozati kapcsolat kezelese
   connectWiFi();
   connectMQTT();
 
@@ -277,75 +368,101 @@ void loop() {
     mqttClient.loop();
   }
 
-  // Gombok olvasasa
+  // Fizikai gombok olvasása
   bool startPressed = buttonPressed(0);
   bool resetPressed = buttonPressed(1);
   bool stopPressed = buttonPressed(2);
   bool emergencyPressed = buttonPressed(3);
 
+  // Webes parancs kiolvasása
+  RemoteCommand remoteCommand = pendingCommand;
+  pendingCommand = NO_COMMAND;
+
+  bool remoteStart = remoteCommand == REMOTE_START;
+  bool remoteStop = remoteCommand == REMOTE_STOP;
+  bool remoteReset = remoteCommand == REMOTE_RESET;
+  bool remoteEmergency =
+    remoteCommand == REMOTE_EMERGENCY_STOP;
+
   bool stateChanged = false;
   const char* eventName = nullptr;
 
-  // A veszalj minden mas muveletnel fontosabb
-  if (emergencyPressed) {
+  // Vészleállítás
+  if (emergencyPressed || remoteEmergency) {
     if (machineState != EMERGENCY_STOP) {
       machineState = EMERGENCY_STOP;
+
       stateChanged = true;
       eventName = "EMERGENCY_STOP";
-      Serial.println("VESZLEALLITAS! A gyartosor megallt.");
+
+      Serial.println("VÉSZLEÁLLÍTÁS! A gyártósor megállt.");
     }
   }
+
+  // Vészállapot feloldása
   else if (machineState == EMERGENCY_STOP) {
-    if (resetPressed) {
+    if (resetPressed || remoteReset) {
       machineState = STOPPED;
+
       stateChanged = true;
       eventName = "EMERGENCY_RESET";
-      Serial.println("Veszallapot torolve. A gyartosor LEALLITVA.");
+
+      Serial.println("Vészállapot törölve. A gyártósor leállítva.");
     }
-    else if (startPressed) {
-      Serial.println("Nem indithato! Eloszor RESET szukseges.");
+    else if (startPressed || remoteStart) {
+      Serial.println("Nem indítható! Először RESET szükséges.");
     }
   }
+
+  // Normál üzemi állapotok
   else {
-    if (stopPressed) {
+    if (stopPressed || remoteStop) {
       if (machineState != STOPPED) {
         machineState = STOPPED;
+
         stateChanged = true;
         eventName = "STOP";
-        Serial.println("STOP: A gyartosor leallt.");
+
+        Serial.println("STOP: A gyártósor leállt.");
       }
     }
-    else if (resetPressed) {
+    else if (resetPressed || remoteReset) {
       machineState = STOPPED;
       totalProduced = 0;
+
       stateChanged = true;
       eventName = "RESET";
-      Serial.println("RESET: A darabszam nullazva.");
+
+      Serial.println("RESET: A darabszám nullázva.");
     }
-    else if (startPressed) {
+    else if (startPressed || remoteStart) {
       if (machineState != RUNNING) {
         machineState = RUNNING;
         lastProductionTime = millis();
+
         stateChanged = true;
         eventName = "START";
-        Serial.println("START: A gyartas elindult.");
+
+        Serial.println("START: A gyártás elindult.");
       }
     }
   }
 
+  // LED-ek frissítése
   updateLEDs();
 
-  // Szimulalt termeles: egy darab ket masodpercenkent
+  // Szimulált termelés
   if (machineState == RUNNING &&
       millis() - lastProductionTime >= PRODUCTION_INTERVAL) {
+
     lastProductionTime = millis();
     totalProduced++;
 
-    Serial.print("Legyartott darabok: ");
+    Serial.print("Legyártott darabok: ");
     Serial.println(totalProduced);
   }
 
-  // Az esemenyek es az aktualis allapot tovabbitasa
+  // Esemény és állapot továbbítása
   if (stateChanged && eventName != nullptr) {
     publishEvent(eventName);
   }
