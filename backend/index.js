@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const http = require("http");
@@ -68,6 +67,7 @@ client.on("message", async (topic, message) => {
 
   lastSeenAt = new Date().toISOString();
 
+  // Gépállapot és termelési adatok mentése
   if (topic === TOPIC_STATUS) {
     latestStatus = data;
 
@@ -75,18 +75,25 @@ client.on("message", async (topic, message) => {
       .from("production_logs")
       .insert({
         machine_status: data.status,
-        total_produced: data.totalProduced
+        total_produced: data.totalProduced ?? 0,
+        good_products: data.goodProducts ?? 0,
+        defective_products: data.defectiveProducts ?? 0
       });
 
     if (error) {
       console.error("Supabase mentési hiba:", error.message);
     } else {
-      console.log("Az állapot sikeresen elmentve a Supabase-be.");
+      console.log("A termelési adatok sikeresen elmentve a Supabase-be.");
+      console.log("Összes termék:", data.totalProduced);
+      console.log("Jó termékek:", data.goodProducts);
+      console.log("Selejtes termékek:", data.defectiveProducts);
     }
   }
 
+  // Eseményadatok eltárolása
   if (topic === TOPIC_EVENT) {
     latestEvent = data;
+    console.log("Új gyártási esemény:", data.event);
   }
 });
 
@@ -99,7 +106,7 @@ client.on("reconnect", () => {
   console.log("Újracsatlakozás az MQTT-brokerhez...");
 });
 
-// JSON válasz
+// JSON válasz küldése
 function sendJson(response, statusCode, data) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -111,9 +118,17 @@ function sendJson(response, statusCode, data) {
 
 // Webes fájlok kiszolgálása
 function serveStaticFile(request, response) {
-  const requestedPath = request.url === "/"
-    ? "index.html"
-    : decodeURIComponent(request.url.split("?")[0].slice(1));
+  let requestedPath;
+
+  try {
+    requestedPath = request.url === "/"
+      ? "index.html"
+      : decodeURIComponent(request.url.split("?")[0].slice(1));
+  } catch {
+    return sendJson(response, 400, {
+      error: "Érvénytelen fájlútvonal."
+    });
+  }
 
   const filePath = path.resolve(PUBLIC_FOLDER, requestedPath);
 
@@ -208,6 +223,7 @@ const server = http.createServer((request, response) => {
         });
       }
 
+      // Parancs továbbítása az ESP32 felé
       client.publish(
         TOPIC_COMMAND,
         JSON.stringify({ command }),

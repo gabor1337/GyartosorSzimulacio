@@ -1,4 +1,3 @@
-
 * {
     margin: 0;
     padding: 0;
@@ -213,6 +212,169 @@ footer {
     margin-top: 35px;
 }
 
+/* Termelesi statisztikak */
+.quality-card .good-value {
+    color: #43b581;
+}
+
+.defect-card .defect-value {
+    color: #e05252;
+}
+
+.quality-summary {
+    margin-bottom: 20px;
+}
+
+.quality-summary .section-heading {
+    margin-bottom: 18px;
+}
+
+.quality-bar {
+    display: flex;
+    width: 100%;
+    height: 14px;
+    overflow: hidden;
+    background: #2d3a47;
+    border-radius: 20px;
+    margin: 18px 0 12px;
+}
+
+.quality-bar-good {
+    width: 0;
+    background: #43b581;
+    transition: width 0.3s ease;
+}
+
+.quality-bar-defect {
+    width: 0;
+    background: #e05252;
+    transition: width 0.3s ease;
+}
+
+.quality-legend {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #9ba8b5;
+    font-size: 13px;
+}
+
+/* Gyartasi naplo */
+.logs-card {
+    margin-top: 20px;
+}
+
+.logs-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.logs-heading h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.refresh-button,
+.filter-button {
+    border: 1px solid #3a4a59;
+    background: #263543;
+    color: #e8edf2;
+    border-radius: 7px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.refresh-button:hover,
+.filter-button:hover {
+    filter: brightness(1.2);
+}
+
+.log-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.filter-button {
+    font-size: 13px;
+    padding: 8px 12px;
+}
+
+.filter-button.active {
+    background: #16834a;
+    border-color: #16834a;
+}
+
+.logs-message {
+    color: #9ba8b5;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 650px;
+    font-size: 13px;
+}
+
+.logs-table th,
+.logs-table td {
+    padding: 13px 12px;
+    text-align: left;
+    border-bottom: 1px solid #2d3a47;
+    white-space: nowrap;
+}
+
+.logs-table th {
+    color: #9ba8b5;
+    font-size: 11px;
+    letter-spacing: 0.7px;
+}
+
+.logs-table tbody tr:hover {
+    background: #22313e;
+}
+
+.empty-log {
+    color: #9ba8b5;
+    text-align: center !important;
+    padding: 25px !important;
+}
+
+.log-tag {
+    display: inline-block;
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.log-good {
+    color: #65d6a0;
+    background: rgba(67, 181, 129, 0.15);
+}
+
+.log-defect {
+    color: #ff7777;
+    background: rgba(224, 82, 82, 0.15);
+}
+
+.log-status {
+    color: #b9c8d6;
+    background: rgba(155, 168, 181, 0.14);
+}
+
 @media (max-width: 700px) {
     .container {
         padding: 25px 15px;
@@ -238,5 +400,15 @@ footer {
 
     .control-grid {
         grid-template-columns: 1fr;
+    }
+
+    .quality-legend {
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .logs-heading {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

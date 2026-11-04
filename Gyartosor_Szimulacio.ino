@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <string.h>
+#include <esp_system.h>
 #include "secrets.h"
 
 // Wi-Fi konfiguráció
@@ -83,7 +84,12 @@ const int buttonPins[4] = {
 
 // Termelési adatok
 unsigned long totalProduced = 0;
+unsigned long goodProducts = 0;
+unsigned long defectiveProducts = 0;
 unsigned long messageNumber = 0;
+
+// Selejtgyártási valószínűség százalékban
+const int DEFECTIVE_PROBABILITY = 5;
 
 // Utoljára elküldött állapot
 MachineState lastPublishedState = STOPPED;
@@ -256,15 +262,17 @@ void publishEvent(const char* eventName) {
     return;
   }
 
-  char payload[160];
+  char payload[256];
 
   snprintf(
     payload,
     sizeof(payload),
-    "{\"event\":\"%s\",\"status\":\"%s\",\"totalProduced\":%lu}",
+    "{\"event\":\"%s\",\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu}",
     eventName,
     getStateName(),
-    totalProduced
+    totalProduced,
+    goodProducts,
+    defectiveProducts
   );
 
   if (mqttClient.publish(TOPIC_EVENT, payload)) {
@@ -302,14 +310,16 @@ void publishStatus(bool force = false) {
     return;
   }
 
-  char payload[160];
+  char payload[256];
 
   snprintf(
     payload,
     sizeof(payload),
-    "{\"status\":\"%s\",\"totalProduced\":%lu,\"messageNumber\":%lu}",
+    "{\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu,\"messageNumber\":%lu}",
     getStateName(),
     totalProduced,
+    goodProducts,
+    defectiveProducts,
     ++messageNumber
   );
 
@@ -341,6 +351,8 @@ void setup() {
   }
 
   updateLEDs();
+
+  randomSeed(esp_random());
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -429,6 +441,8 @@ void loop() {
     else if (resetPressed || remoteReset) {
       machineState = STOPPED;
       totalProduced = 0;
+      goodProducts = 0;
+      defectiveProducts = 0;
 
       stateChanged = true;
       eventName = "RESET";
@@ -458,8 +472,23 @@ void loop() {
     lastProductionTime = millis();
     totalProduced++;
 
-    Serial.print("Legyártott darabok: ");
+    if (random(100) < DEFECTIVE_PROBABILITY) {
+      defectiveProducts++;
+      Serial.println("Selejtes termek keszult!");
+      publishEvent("PRODUCT_REJECTED");
+    }
+    else {
+      goodProducts++;
+      Serial.println("Jo termek keszult.");
+      publishEvent("PRODUCT_GOOD");
+    }
+
+    Serial.print("Osszes legyartott termek: ");
     Serial.println(totalProduced);
+    Serial.print("Jo termekek: ");
+    Serial.println(goodProducts);
+    Serial.print("Selejtes termekek: ");
+    Serial.println(defectiveProducts);
   }
 
   // Esemény és állapot továbbítása

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="hu">
 <head>
@@ -6,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gyártósor felügyelet</title>
     <link rel="stylesheet" href="style.css">
-    
 </head>
 <body>
     <div class="container">
@@ -27,15 +25,40 @@
                 <div class="card status-card">
                     <p class="card-label">GÉPÁLLAPOT</p>
                     <h2 id="machineStatus" class="status-value">ISMERETLEN</h2>
-                    <p id="statusDescription" class="card-description">
-                        Várakozás az adatokra...
-                    </p>
+                    <p id="statusDescription" class="card-description">Várakozás az adatokra...</p>
                 </div>
 
                 <div class="card production-card">
-                    <p class="card-label">LEGYÁRTOTT DARABOK</p>
+                    <p class="card-label">ÖSSZES LEGYÁRTOTT DARAB</p>
                     <h2 id="productionCount" class="production-value">0</h2>
                     <p class="card-description">Összesített termelés</p>
+                </div>
+
+                <div class="card quality-card">
+                    <p class="card-label">JÓ TERMÉKEK</p>
+                    <h2 id="goodProducts" class="production-value good-value">0</h2>
+                    <p class="card-description">Megfelelő minőségű termékek</p>
+                </div>
+
+                <div class="card defect-card">
+                    <p class="card-label">SELEJTES TERMÉKEK</p>
+                    <h2 id="defectiveProducts" class="production-value defect-value">0</h2>
+                    <p class="card-description">Hibás termékek</p>
+                </div>
+            </section>
+
+            <section class="card quality-summary">
+                <div class="section-heading">
+                    <h2>Minőségi mutatók</h2>
+                    <p class="card-description">A termelés minőségi megoszlása</p>
+                </div>
+                <div class="quality-bar">
+                    <div id="goodBar" class="quality-bar-good"></div>
+                    <div id="defectBar" class="quality-bar-defect"></div>
+                </div>
+                <div class="quality-legend">
+                    <span id="goodPercentage">Jó termékek: 0%</span>
+                    <span id="defectPercentage">Selejtarány: 0%</span>
                 </div>
             </section>
 
@@ -43,49 +66,31 @@
                 <div class="section-heading">
                     <div>
                         <h2>Gépvezérlés</h2>
-                        <p class="card-description">
-                            A gyártósor távoli vezérlése
-                        </p>
+                        <p class="card-description">A gyártósor távoli vezérlése</p>
                     </div>
                 </div>
 
                 <div class="control-grid">
-                    <button id="startButton" class="control-button start">
-                        START
-                    </button>
-
-                    <button id="stopButton" class="control-button stop">
-                        STOP
-                    </button>
-
-                    <button id="resetButton" class="control-button reset">
-                        RESET
-                    </button>
-
-                    <button id="emergencyButton" class="control-button emergency">
-                        VÉSZLEÁLLÍTÁS
-                    </button>
+                    <button id="startButton" class="control-button start">START</button>
+                    <button id="stopButton" class="control-button stop">STOP</button>
+                    <button id="resetButton" class="control-button reset">RESET</button>
+                    <button id="emergencyButton" class="control-button emergency">VÉSZLEÁLLÍTÁS</button>
                 </div>
 
-                <p id="commandMessage" class="command-message">
-                    Válassz egy vezérlőparancsot.
-                </p>
+                <p id="commandMessage" class="command-message">Válassz egy vezérlőparancsot.</p>
             </section>
 
             <section class="information-grid">
                 <div class="card">
                     <h2>Kommunikáció</h2>
-
                     <div class="info-row">
                         <span>Node.js API</span>
                         <span id="apiStatus" class="info-value">Ellenőrzés...</span>
                     </div>
-
                     <div class="info-row">
                         <span>MQTT kapcsolat</span>
                         <span id="mqttStatus" class="info-value">Ellenőrzés...</span>
                     </div>
-
                     <div class="info-row">
                         <span>Utolsó adatfrissítés</span>
                         <span id="lastUpdate" class="info-value">-</span>
@@ -98,6 +103,45 @@
                     <p id="lastEventTime" class="card-description">-</p>
                 </div>
             </section>
+
+            <section class="card logs-card">
+                <div class="logs-heading">
+                    <div>
+                        <h2>Gyártási napló</h2>
+                        <p class="card-description">A Supabase adatbázisban rögzített termelési adatok</p>
+                    </div>
+                    <button id="refreshLogsButton" class="refresh-button" type="button">Frissítés</button>
+                </div>
+
+                <div class="log-filters" role="group" aria-label="Napló szűrése">
+                    <button class="filter-button active" data-filter="all" type="button">Összes</button>
+                    <button class="filter-button" data-filter="good" type="button">Jó termék</button>
+                    <button class="filter-button" data-filter="defect" type="button">Selejt</button>
+                    <button class="filter-button" data-filter="status" type="button">Állapotfrissítés</button>
+                </div>
+
+                <p id="logsMessage" class="logs-message">Naplóadatok betöltése...</p>
+
+                <div class="table-wrapper">
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Időpont</th>
+                                <th>Esemény</th>
+                                <th>Gépállapot</th>
+                                <th>Összes</th>
+                                <th>Jó</th>
+                                <th>Selejt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <tr>
+                                <td colspan="6" class="empty-log">Naplóadatok betöltése...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </main>
 
         <footer>
@@ -106,6 +150,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

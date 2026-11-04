@@ -1,8 +1,7 @@
-
-const SUPABASE_URL = "https://supabase.com/dashboard/project/ivgmosxahfpxetlndlfk";
+// Supabase konfiguráció
+const SUPABASE_URL = "https://ivgmosxahfpxetlndlfk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_CeXsLd1vg33iju9VqNEFwg_5fhhA543";
 
-// Supabase kapcsolat
 const supabaseClient = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
@@ -11,19 +10,29 @@ const supabaseClient = window.supabase.createClient(
 // HTML elemek
 const machineStatus = document.getElementById("machineStatus");
 const productionCount = document.getElementById("productionCount");
+const goodProductsElement = document.getElementById("goodProducts");
+const defectiveProductsElement = document.getElementById("defectiveProducts");
 const statusDescription = document.getElementById("statusDescription");
 
 const connectionIndicator = document.getElementById("connectionIndicator");
 const connectionText = document.getElementById("connectionText");
-
 const apiStatus = document.getElementById("apiStatus");
 const mqttStatus = document.getElementById("mqttStatus");
 
 const lastUpdate = document.getElementById("lastUpdate");
 const lastEvent = document.getElementById("lastEvent");
 const lastEventTime = document.getElementById("lastEventTime");
-
 const commandMessage = document.getElementById("commandMessage");
+
+const goodBar = document.getElementById("goodBar");
+const defectBar = document.getElementById("defectBar");
+const goodPercentage = document.getElementById("goodPercentage");
+const defectPercentage = document.getElementById("defectPercentage");
+
+const logsTableBody = document.getElementById("logsTableBody");
+const logsMessage = document.getElementById("logsMessage");
+const refreshLogsButton = document.getElementById("refreshLogsButton");
+const filterButtons = document.querySelectorAll(".filter-button");
 
 const buttons = {
     START: document.getElementById("startButton"),
@@ -32,68 +41,75 @@ const buttons = {
     EMERGENCY_STOP: document.getElementById("emergencyButton")
 };
 
+let productionLogs = [];
+let activeLogFilter = "all";
+
+function safeNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+// Termelési mutatók frissítése
+function updateProductionStats(data) {
+    const total = safeNumber(data.totalProduced ?? data.total_produced);
+    const good = safeNumber(data.goodProducts ?? data.good_products);
+    const defective = safeNumber(data.defectiveProducts ?? data.defective_products);
+
+    productionCount.textContent = total;
+    goodProductsElement.textContent = good;
+    defectiveProductsElement.textContent = defective;
+
+    const qualityTotal = good + defective;
+    const goodRate = qualityTotal > 0 ? (good / qualityTotal) * 100 : 0;
+    const defectRate = qualityTotal > 0 ? (defective / qualityTotal) * 100 : 0;
+
+    goodBar.style.width = `${goodRate}%`;
+    defectBar.style.width = `${defectRate}%`;
+
+    goodPercentage.textContent = `Jó termékek: ${goodRate.toFixed(1)}%`;
+    defectPercentage.textContent = `Selejtarány: ${defectRate.toFixed(1)}%`;
+}
+
 // Gépállapot megjelenítése
 function updateMachineStatus(data) {
-    if (!data) {
-        return;
-    }
+    if (!data || !data.status) return;
 
-    const status = data.status;
-
-    if (!status) {
-        return;
-    }
-
-    machineStatus.textContent = status.status || "ISMERETLEN";
-    productionCount.textContent = status.totalProduced ?? 0;
-
+    const status = data.status.status;
+    machineStatus.textContent = status || "ISMERETLEN";
     machineStatus.className = "status-value";
 
-    if (status.status === "RUNNING") {
+    if (status === "RUNNING") {
         machineStatus.classList.add("running");
         statusDescription.textContent = "A gyártás folyamatban van.";
-    } else if (status.status === "STOPPED") {
+    } else if (status === "STOPPED") {
         machineStatus.classList.add("stopped");
         statusDescription.textContent = "A gyártósor jelenleg áll.";
-    } else if (status.status === "EMERGENCY_STOP") {
+    } else if (status === "EMERGENCY_STOP") {
         machineStatus.classList.add("emergency");
         statusDescription.textContent = "Vészleállítás aktív!";
+    } else {
+        statusDescription.textContent = "A gép állapota frissült.";
     }
 
-    if (data.lastEvent) {
-        lastEvent.textContent =
-            data.lastEvent.event || "Ismeretlen esemény";
+    updateProductionStats(data.status);
 
-        lastEventTime.textContent =
-            data.lastSeenAt
-                ? new Date(data.lastSeenAt).toLocaleString("hu-HU")
-                : "-";
+    if (data.lastEvent) {
+        lastEvent.textContent = data.lastEvent.event || "Ismeretlen esemény";
+        lastEventTime.textContent = data.lastSeenAt
+            ? new Date(data.lastSeenAt).toLocaleString("hu-HU")
+            : "-";
     }
 
     lastUpdate.textContent = new Date().toLocaleTimeString("hu-HU");
 }
 
-// Legutóbbi adat lekérése a Supabase-ből
-async function fetchLatestProduction() {
-    const { data, error } = await supabaseClient
-        .from("production_logs")
-        .select("machine_status, total_produced, recorded_at")
-        .order("recorded_at", { ascending: false })
-        .limit(1);
-
-    if (error) {
-        console.error("Supabase lekérdezési hiba:", error.message);
-        return;
-    }
-
-    if (data && data.length > 0) {
-        updateProductionFromDatabase(data[0]);
-    }
-}
-
-// Új termelési adat megjelenítése
+// Supabase rekord megjelenítése
 function updateProductionFromDatabase(record) {
-    productionCount.textContent = record.total_produced ?? 0;
+    if (!record) return;
+
+    productionCount.textContent = safeNumber(record.total_produced);
+    goodProductsElement.textContent = safeNumber(record.good_products);
+    defectiveProductsElement.textContent = safeNumber(record.defective_products);
 
     const status = record.machine_status;
 
@@ -113,8 +129,121 @@ function updateProductionFromDatabase(record) {
         }
     }
 
-    lastUpdate.textContent =
-        new Date(record.recorded_at).toLocaleTimeString("hu-HU");
+    updateProductionStats(record);
+    lastUpdate.textContent = new Date(record.recorded_at).toLocaleTimeString("hu-HU");
+}
+
+// Naplóesemény meghatározása
+function getLogEvent(current, previous) {
+    if (previous) {
+        const currentDefects = safeNumber(current.defective_products);
+        const previousDefects = safeNumber(previous.defective_products);
+        const currentGood = safeNumber(current.good_products);
+        const previousGood = safeNumber(previous.good_products);
+
+        if (currentDefects > previousDefects) {
+            return { label: "Selejtes termék", type: "defect" };
+        }
+
+        if (currentGood > previousGood) {
+            return { label: "Jó termék", type: "good" };
+        }
+    }
+
+    if (current.machine_status === "EMERGENCY_STOP") {
+        return { label: "Vészleállítás", type: "defect" };
+    }
+
+    return { label: "Állapotfrissítés", type: "status" };
+}
+
+// Napló megjelenítése
+function renderLogs() {
+    const chronological = [...productionLogs].reverse();
+
+    const rows = chronological.map((record, index) => {
+        const previous = index > 0 ? chronological[index - 1] : null;
+
+        return {
+            record,
+            event: getLogEvent(record, previous)
+        };
+    }).reverse();
+
+    const filteredRows = activeLogFilter === "all"
+        ? rows
+        : rows.filter(item => item.event.type === activeLogFilter);
+
+    logsTableBody.innerHTML = "";
+
+    if (filteredRows.length === 0) {
+        logsTableBody.innerHTML =
+            '<tr><td colspan="6" class="empty-log">Nincs megjeleníthető naplóbejegyzés.</td></tr>';
+
+        logsMessage.textContent = productionLogs.length
+            ? `${productionLogs.length} rekord betöltve.`
+            : "Még nem érkezett termelési adat.";
+
+        return;
+    }
+
+    filteredRows.forEach(({ record, event }) => {
+        const row = document.createElement("tr");
+
+        const date = record.recorded_at
+            ? new Date(record.recorded_at).toLocaleString("hu-HU")
+            : "-";
+
+        const eventClass = event.type === "good"
+            ? "log-good"
+            : event.type === "defect"
+                ? "log-defect"
+                : "log-status";
+
+        row.innerHTML = `
+            <td>${date}</td>
+            <td><span class="log-tag ${eventClass}">${event.label}</span></td>
+            <td>${record.machine_status || "-"}</td>
+            <td>${safeNumber(record.total_produced)}</td>
+            <td>${safeNumber(record.good_products)}</td>
+            <td>${safeNumber(record.defective_products)}</td>
+        `;
+
+        logsTableBody.appendChild(row);
+    });
+
+    logsMessage.textContent =
+        `${filteredRows.length} naplóbejegyzés megjelenítve.`;
+}
+
+// Naplóadatok lekérése
+async function fetchProductionLogs() {
+    logsMessage.textContent = "Naplóadatok betöltése...";
+
+    const { data, error } = await supabaseClient
+        .from("production_logs")
+        .select("machine_status, total_produced, good_products, defective_products, recorded_at")
+        .order("recorded_at", { ascending: false })
+        .limit(100);
+
+    if (error) {
+        console.error("Napló lekérdezési hiba:", error.message);
+
+        logsMessage.textContent =
+            `Naplóbetöltési hiba: ${error.message}`;
+
+        logsTableBody.innerHTML =
+            '<tr><td colspan="6" class="empty-log">Nem sikerült betölteni a naplót.</td></tr>';
+
+        return;
+    }
+
+    productionLogs = data || [];
+    renderLogs();
+
+    if (productionLogs.length > 0) {
+        updateProductionFromDatabase(productionLogs[0]);
+    }
 }
 
 // Supabase Realtime feliratkozás
@@ -131,14 +260,20 @@ function startRealtime() {
             (payload) => {
                 console.log("Új Supabase rekord:", payload.new);
 
+                productionLogs.unshift(payload.new);
+                productionLogs = productionLogs.slice(0, 100);
+
                 updateProductionFromDatabase(payload.new);
+                renderLogs();
             }
         )
-        .subscribe((status) => {
+        .subscribe((status, error) => {
             console.log("Supabase Realtime állapot:", status);
 
             if (status === "SUBSCRIBED") {
                 console.log("Supabase Realtime sikeresen csatlakozott.");
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                console.error("Supabase Realtime kapcsolódási hiba:", error);
             }
         });
 }
@@ -212,25 +347,30 @@ async function sendCommand(command) {
 }
 
 // Vezérlőgombok eseménykezelése
-buttons.START.addEventListener("click", () => {
-    sendCommand("START");
-});
+buttons.START.addEventListener("click", () => sendCommand("START"));
+buttons.STOP.addEventListener("click", () => sendCommand("STOP"));
+buttons.RESET.addEventListener("click", () => sendCommand("RESET"));
+buttons.EMERGENCY_STOP.addEventListener("click", () => sendCommand("EMERGENCY_STOP"));
 
-buttons.STOP.addEventListener("click", () => {
-    sendCommand("STOP");
-});
+// Napló frissítése
+refreshLogsButton.addEventListener("click", fetchProductionLogs);
 
-buttons.RESET.addEventListener("click", () => {
-    sendCommand("RESET");
-});
+// Napló szűrése
+filterButtons.forEach(button => {
+    button.addEventListener("click", () => {
+        activeLogFilter = button.dataset.filter;
 
-buttons.EMERGENCY_STOP.addEventListener("click", () => {
-    sendCommand("EMERGENCY_STOP");
+        filterButtons.forEach(item => {
+            item.classList.toggle("active", item === button);
+        });
+
+        renderLogs();
+    });
 });
 
 // Alkalmazás indítása
 async function initializeApp() {
-    await fetchLatestProduction();
+    await fetchProductionLogs();
 
     startRealtime();
 
