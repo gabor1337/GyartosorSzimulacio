@@ -1,4 +1,3 @@
-
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <string.h>
@@ -87,6 +86,12 @@ unsigned long totalProduced = 0;
 unsigned long goodProducts = 0;
 unsigned long defectiveProducts = 0;
 unsigned long messageNumber = 0;
+
+// Gyártási ciklusidő adatok
+unsigned long lastCycleTime = 0;
+unsigned long totalCycleTime = 0;
+unsigned long averageCycleTime = 0;
+unsigned long cycleCount = 0;
 
 // Selejtgyártási valószínűség százalékban
 const int DEFECTIVE_PROBABILITY = 5;
@@ -262,17 +267,20 @@ void publishEvent(const char* eventName) {
     return;
   }
 
-  char payload[256];
+  char payload[384];
 
   snprintf(
     payload,
     sizeof(payload),
-    "{\"event\":\"%s\",\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu}",
+    "{\"event\":\"%s\",\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu,\"lastCycleTimeMs\":%lu,\"averageCycleTimeMs\":%lu,\"cycleCount\":%lu}",
     eventName,
     getStateName(),
     totalProduced,
     goodProducts,
-    defectiveProducts
+    defectiveProducts,
+    lastCycleTime,
+    averageCycleTime,
+    cycleCount
   );
 
   if (mqttClient.publish(TOPIC_EVENT, payload)) {
@@ -310,17 +318,20 @@ void publishStatus(bool force = false) {
     return;
   }
 
-  char payload[256];
+  char payload[384];
 
   snprintf(
     payload,
     sizeof(payload),
-    "{\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu,\"messageNumber\":%lu}",
+    "{\"status\":\"%s\",\"totalProduced\":%lu,\"goodProducts\":%lu,\"defectiveProducts\":%lu,\"messageNumber\":%lu,\"lastCycleTimeMs\":%lu,\"averageCycleTimeMs\":%lu,\"cycleCount\":%lu}",
     getStateName(),
     totalProduced,
     goodProducts,
     defectiveProducts,
-    ++messageNumber
+    ++messageNumber,
+    lastCycleTime,
+    averageCycleTime,
+    cycleCount
   );
 
   if (mqttClient.publish(TOPIC_STATUS, payload)) {
@@ -358,7 +369,7 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-  mqttClient.setBufferSize(256);
+  mqttClient.setBufferSize(384);
   mqttClient.setCallback(mqttCallback);
 
   Serial.println();
@@ -444,10 +455,15 @@ void loop() {
       goodProducts = 0;
       defectiveProducts = 0;
 
+      lastCycleTime = 0;
+      totalCycleTime = 0;
+      averageCycleTime = 0;
+      cycleCount = 0;
+
       stateChanged = true;
       eventName = "RESET";
 
-      Serial.println("RESET: A darabszám nullázva.");
+      Serial.println("RESET: A termelési és ciklusidő-adatok nullázva.");
     }
     else if (startPressed || remoteStart) {
       if (machineState != RUNNING) {
@@ -465,12 +481,28 @@ void loop() {
   // LED-ek frissítése
   updateLEDs();
 
-  // Szimulált termelés
+  // Szimulált termelés és ciklusidő mérése
   if (machineState == RUNNING &&
       millis() - lastProductionTime >= PRODUCTION_INTERVAL) {
 
-    lastProductionTime = millis();
+    unsigned long currentTime = millis();
+
+    lastCycleTime = currentTime - lastProductionTime;
+    lastProductionTime = currentTime;
+
+    cycleCount++;
+    totalCycleTime += lastCycleTime;
+    averageCycleTime = totalCycleTime / cycleCount;
+
     totalProduced++;
+
+    Serial.print("Utolso ciklusido: ");
+    Serial.print(lastCycleTime);
+    Serial.println(" ms");
+
+    Serial.print("Atlagos ciklusido: ");
+    Serial.print(averageCycleTime);
+    Serial.println(" ms");
 
     if (random(100) < DEFECTIVE_PROBABILITY) {
       defectiveProducts++;
@@ -485,8 +517,10 @@ void loop() {
 
     Serial.print("Osszes legyartott termek: ");
     Serial.println(totalProduced);
+
     Serial.print("Jo termekek: ");
     Serial.println(goodProducts);
+
     Serial.print("Selejtes termekek: ");
     Serial.println(defectiveProducts);
   }

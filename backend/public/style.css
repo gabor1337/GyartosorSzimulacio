@@ -375,6 +375,25 @@ footer {
     background: rgba(155, 168, 181, 0.14);
 }
 
+/* Ciklusido mutatok */
+.cycle-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.cycle-card .card-label {
+    margin-bottom: 18px;
+}
+
+.cycle-value {
+    color: #55b9d1;
+    font-size: 38px;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 700px) {
     .container {
         padding: 25px 15px;
@@ -410,5 +429,9 @@ footer {
     .logs-heading {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .cycle-grid {
+        grid-template-columns: 1fr;
     }
 }

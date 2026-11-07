@@ -12,6 +12,9 @@ const machineStatus = document.getElementById("machineStatus");
 const productionCount = document.getElementById("productionCount");
 const goodProductsElement = document.getElementById("goodProducts");
 const defectiveProductsElement = document.getElementById("defectiveProducts");
+const lastCycleTimeElement = document.getElementById("lastCycleTime");
+const averageCycleTimeElement = document.getElementById("averageCycleTime");
+const cycleCountElement = document.getElementById("cycleCount");
 const statusDescription = document.getElementById("statusDescription");
 
 const connectionIndicator = document.getElementById("connectionIndicator");
@@ -49,11 +52,32 @@ function safeNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
+function formatCycleTime(value) {
+    const milliseconds = safeNumber(value);
+
+    if (milliseconds <= 0) {
+        return "0 ms";
+    }
+
+    if (milliseconds >= 1000) {
+        return `${(milliseconds / 1000).toFixed(2)} s`;
+    }
+
+    return `${milliseconds.toFixed(0)} ms`;
+}
+
 // Termelési mutatók frissítése
 function updateProductionStats(data) {
     const total = safeNumber(data.totalProduced ?? data.total_produced);
     const good = safeNumber(data.goodProducts ?? data.good_products);
     const defective = safeNumber(data.defectiveProducts ?? data.defective_products);
+    const lastCycleTime = safeNumber(data.lastCycleTimeMs ?? data.last_cycle_time_ms);
+    const averageCycleTime = safeNumber(data.averageCycleTimeMs ?? data.average_cycle_time_ms);
+    const cycleCount = safeNumber(data.cycleCount ?? data.cycle_count);
+
+    lastCycleTimeElement.textContent = formatCycleTime(lastCycleTime);
+    averageCycleTimeElement.textContent = formatCycleTime(averageCycleTime);
+    cycleCountElement.textContent = cycleCount;
 
     productionCount.textContent = total;
     goodProductsElement.textContent = good;
@@ -178,7 +202,7 @@ function renderLogs() {
 
     if (filteredRows.length === 0) {
         logsTableBody.innerHTML =
-            '<tr><td colspan="6" class="empty-log">Nincs megjeleníthető naplóbejegyzés.</td></tr>';
+            '<tr><td colspan="7" class="empty-log">Nincs megjeleníthető naplóbejegyzés.</td></tr>';
 
         logsMessage.textContent = productionLogs.length
             ? `${productionLogs.length} rekord betöltve.`
@@ -207,6 +231,7 @@ function renderLogs() {
             <td>${safeNumber(record.total_produced)}</td>
             <td>${safeNumber(record.good_products)}</td>
             <td>${safeNumber(record.defective_products)}</td>
+            <td>${formatCycleTime(record.last_cycle_time_ms)}</td>
         `;
 
         logsTableBody.appendChild(row);
@@ -222,7 +247,7 @@ async function fetchProductionLogs() {
 
     const { data, error } = await supabaseClient
         .from("production_logs")
-        .select("machine_status, total_produced, good_products, defective_products, recorded_at")
+        .select("machine_status, total_produced, good_products, defective_products, last_cycle_time_ms, average_cycle_time_ms, cycle_count, recorded_at")
         .order("recorded_at", { ascending: false })
         .limit(100);
 
@@ -233,7 +258,7 @@ async function fetchProductionLogs() {
             `Naplóbetöltési hiba: ${error.message}`;
 
         logsTableBody.innerHTML =
-            '<tr><td colspan="6" class="empty-log">Nem sikerült betölteni a naplót.</td></tr>';
+            '<tr><td colspan="7" class="empty-log">Nem sikerült betölteni a naplót.</td></tr>';
 
         return;
     }

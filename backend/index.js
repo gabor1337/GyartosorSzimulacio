@@ -77,7 +77,11 @@ client.on("message", async (topic, message) => {
         machine_status: data.status,
         total_produced: data.totalProduced ?? 0,
         good_products: data.goodProducts ?? 0,
-        defective_products: data.defectiveProducts ?? 0
+        defective_products: data.defectiveProducts ?? 0,
+
+        last_cycle_time_ms: data.lastCycleTimeMs ?? 0,
+        average_cycle_time_ms: data.averageCycleTimeMs ?? 0,
+        cycle_count: data.cycleCount ?? 0
       });
 
     if (error) {
@@ -87,6 +91,9 @@ client.on("message", async (topic, message) => {
       console.log("Összes termék:", data.totalProduced);
       console.log("Jó termékek:", data.goodProducts);
       console.log("Selejtes termékek:", data.defectiveProducts);
+      console.log("Utolsó ciklusidő:", data.lastCycleTimeMs, "ms");
+      console.log("Átlagos ciklusidő:", data.averageCycleTimeMs, "ms");
+      console.log("Ciklusok száma:", data.cycleCount);
     }
   }
 

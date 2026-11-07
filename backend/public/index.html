@@ -47,6 +47,26 @@
                 </div>
             </section>
 
+            <section class="cycle-grid">
+                <div class="card cycle-card">
+                    <p class="card-label">UTOLSÓ CIKLUSIDŐ</p>
+                    <h2 id="lastCycleTime" class="cycle-value">0 ms</h2>
+                    <p class="card-description">Az utolsó gyártási ciklus időtartama</p>
+                </div>
+
+                <div class="card cycle-card">
+                    <p class="card-label">ÁTLAGOS CIKLUSIDŐ</p>
+                    <h2 id="averageCycleTime" class="cycle-value">0 ms</h2>
+                    <p class="card-description">Az eddigi ciklusok átlagos időtartama</p>
+                </div>
+
+                <div class="card cycle-card">
+                    <p class="card-label">CIKLUSOK SZÁMA</p>
+                    <h2 id="cycleCount" class="cycle-value">0</h2>
+                    <p class="card-description">Mért gyártási ciklusok</p>
+                </div>
+            </section>
+
             <section class="card quality-summary">
                 <div class="section-heading">
                     <h2>Minőségi mutatók</h2>
@@ -132,11 +152,12 @@
                                 <th>Összes</th>
                                 <th>Jó</th>
                                 <th>Selejt</th>
+                                <th>Utolsó ciklusidő</th>
                             </tr>
                         </thead>
                         <tbody id="logsTableBody">
                             <tr>
-                                <td colspan="6" class="empty-log">Naplóadatok betöltése...</td>
+                                <td colspan="7" class="empty-log">Naplóadatok betöltése...</td>
                             </tr>
                         </tbody>
                     </table>
