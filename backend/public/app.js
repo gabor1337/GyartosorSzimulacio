@@ -157,7 +157,7 @@ function updateProductionFromDatabase(record) {
     lastUpdate.textContent = new Date(record.recorded_at).toLocaleTimeString("hu-HU");
 }
 
-// Naplóesemény meghatározása
+// Eseménynapló meghatározása
 function getLogEvent(current, previous) {
     if (previous) {
         const currentDefects = safeNumber(current.defective_products);

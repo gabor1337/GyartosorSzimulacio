@@ -64,7 +64,6 @@ client.on("message", async (topic, message) => {
     console.log("Érvénytelen JSON-üzenet:", content);
     return;
   }
-
   lastSeenAt = new Date().toISOString();
 
   // Gépállapot és termelési adatok mentése
