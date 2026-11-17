@@ -2,106 +2,180 @@
 
 ## 1. A projekt bemutatása
 
-A projekt célja egy webalapú gyártósor-felügyeleti rendszer prototípusának elkészítése, amely egy ESP32 mikrokontroller segítségével szimulálja egy ipari gyártósor alapvető működését.
+A projekt egy ESP32-S3 mikrokontrollerre épülő, webalapú gyártósor-felügyeleti rendszer, amely egy ipari gyártósor alapvető működését szimulálja.
 
-A rendszer hosszabb távú célja, hogy lehetővé tegye a gyártási folyamat állapotának távoli megfigyelését, a termelési adatok nyomon követését és a hibák jelzését egy webes felületen keresztül.
+A rendszer célja a gyártási folyamat állapotának nyomon követése, a termelési adatok kezelése és megjelenítése, valamint a gyártósor webes felületen keresztüli vezérlése.
 
-A fejlesztés egy mérnökinformatikus szakdolgozat része, amely a mikrokontroller-programozást, az IoT-kommunikációt, az adatkezelést és a webfejlesztést kapcsolja össze.
+A megvalósítás az ESP32-S3 mikrokontrollert, az MQTT-alapú kommunikációt, a Node.js háttérprogramot, a Supabase adatbázist és a HTML, CSS, JavaScript technológiákra épülő webes felületet kapcsolja össze.
 
-## 2. Jelenlegi funkciók
+A projekt mérnökinformatikus szakdolgozat keretében készült.
 
-A projekt jelenlegi változata az alábbi funkciókat valósítja meg:
+## 2. A rendszer felépítése
 
-- A gyártósor állapotának szimulálása.
-- A gyártósor indítása és leállítása nyomógombokkal.
-- Vészleállítás és visszaállítás kezelése.
-- A gyártósor állapotának jelzése LED-ekkel.
-- A legyártott darabok számának szimulált nyilvántartása.
-- A működési állapot és a termelési adatok megjelenítése a soros monitoron.
-- A nyomógombok pergésének szoftveres kezelése.
+A rendszer működése több egymáshoz kapcsolódó komponensre épül:
 
-A jelenlegi prototípusban a termelési folyamat és a darabszám növekedése szimulált, nem tényleges gyártógépről vagy érzékelőről származik.
+- **ESP32-S3:** a gyártósor működésének és a termelési folyamatnak a szimulációja.
+- **Mosquitto:** MQTT broker, amely biztosítja az eszközök közötti üzenetváltást.
+- **Node.js:** a háttérprogram, amely feldolgozza az MQTT-üzeneteket, kezeli az API-végpontokat és az adatbázis-kapcsolatot.
+- **Supabase:** a termelési adatok tárolására és lekérdezésére szolgáló adatbázis.
+- **Webes felület:** a gépállapotok, termelési adatok és események megjelenítése, valamint a vezérlőparancsok küldése.
 
-## 3. Felhasznált hardverelemek
+### Adatkommunikáció
 
-- ESP32-S3-DEV-N16R8 mikrokontroller
+Az ESP32-S3 MQTT-protokollon keresztül továbbítja a gyártósor állapotát és a termelési adatokat. A Node.js háttérprogram fogadja és feldolgozza ezeket az üzeneteket, majd az adatokat elmenti a Supabase adatbázisba.
+
+A webes felület a háttérprogram API-végpontján keresztül kéri le az aktuális állapotot. A felhasználó által kiadott vezérlőparancsok a háttérprogramon keresztül, MQTT-üzenetként jutnak el az ESP32-höz.
+
+## 3. Megvalósított funkciók
+
+A rendszer az alábbi funkciókat valósítja meg:
+
+- A gyártósor működésének szimulációja.
+- START, STOP, RESET és vészleállítás kezelése.
+- A gépállapotok jelzése LED-ekkel.
+- A termelési folyamat és a darabszám növekedésének szimulációja.
+- Megfelelő és selejtes termékek nyilvántartása.
+- A termelési ciklusidők mérése.
+- MQTT-alapú adatkommunikáció.
+- A gépállapotok és termelési adatok továbbítása a háttérrendszerbe.
+- Termelési adatok mentése Supabase adatbázisba.
+- Webes felügyeleti és vezérlőfelület.
+- Termelési adatok és eseménynapló megjelenítése.
+- Webes vezérlőparancsok továbbítása a mikrokontrollernek.
+
+**Fontos:** a projekt szimulációs prototípus. A termelési folyamat és a termékek minősítése programozott módon történik, nem fizikai gyártógép vagy külső érzékelők alapján. A vészleállítás szoftveres funkció, nem helyettesít ipari biztonsági vészleállító rendszert.
+
+## 4. Felhasznált hardverelemek
+
+- ESP32-S3-DEV-N16R8 fejlesztőpanel
 - Próbapanel
 - Zöld, sárga és piros LED
 - 220 Ω-os ellenállások
 - START nyomógomb
 - STOP nyomógomb
 - RESET nyomógomb
-- VÉSZLEÁLLÍTÁS nyomógomb
+- Vészleállító nyomógomb
 - USB-C adatkábel
 
 ### GPIO-kiosztás
 
-| Elem | ESP32 GPIO |
-|---|---:|
-| Zöld LED – működés | GPIO17 |
-| Sárga LED – leállított állapot | GPIO16 |
-| Piros LED – vészleállítás | GPIO4 |
-| START gomb | GPIO15 |
-| RESET gomb | GPIO7 |
-| STOP gomb | GPIO6 |
-| VÉSZLEÁLLÍTÁS gomb | GPIO5 |
+| Elem | ESP32-S3 GPIO |
+|---|---|
+| Zöld LED – RUNNING | GPIO17 |
+| Sárga LED – STOPPED | GPIO16 |
+| Piros LED – EMERGENCY_STOP | GPIO4 |
+| START nyomógomb | GPIO15 |
+| RESET nyomógomb | GPIO7 |
+| STOP nyomógomb | GPIO6 |
+| Vészleállító nyomógomb | GPIO5 |
 
-A nyomógombok belső felhúzóellenállással (`INPUT_PULLUP`) működnek. A LED-ek áramkorlátozását 220 Ω-os ellenállások biztosítják.
+A nyomógombok belső felhúzóellenállással (`INPUT_PULLUP`) működnek.
 
-**Fontos:** a prototípus vészleállítása kizárólag szoftveres szimuláció. Nem helyettesít ipari környezetben alkalmazott, biztonsági szempontból megfelelően kialakított vészleállító áramkört.
+## 5. Alkalmazott technológiák
 
-## 4. Tervezett továbbfejlesztések
+| Technológia | Felhasználási terület |
+|---|---|
+| C++ / Arduino | ESP32-S3 vezérlőprogram |
+| Arduino IDE | Mikrokontroller programozása |
+| Wi-Fi | Vezeték nélküli kommunikáció |
+| MQTT | Üzenetküldés az eszközök között |
+| Eclipse Mosquitto | MQTT broker |
+| Node.js | Háttérprogram |
+| JavaScript | Backend és frontend működése |
+| HTML | Webes felület szerkezete |
+| CSS | Webes felület megjelenítése |
+| Supabase | Adattárolás és Realtime |
+| PostgreSQL | Relációs adatbázis |
+| Git / GitHub | Verziókövetés és forráskód tárolása |
 
-A projekt későbbi fejlesztési szakaszaiban a következő funkciók megvalósítása a cél:
+## 6. MQTT témakörök
 
-- Wi-Fi-kommunikáció az ESP32 és a háttérrendszer között.
-- MQTT-protokoll használata az adatok továbbítására.
-- Háttéralkalmazás és adatbázis kialakítása.
-- Webes kezelőfelület létrehozása a gyártósor állapotának megjelenítésére.
-- Termelési adatok és események tárolása.
-- Grafikonok és statisztikák készítése.
-- A rendelkezésre álló adatok alapján az OEE (Overall Equipment Effectiveness) mutató számításának előkészítése.
+A rendszer az alábbi MQTT-témaköröket használja:
 
-Ezek a funkciók a fejlesztés következő szakaszainak részét képezik, ezért nem tekinthetők a jelenlegi változatban már megvalósítottnak.
+| Témakör | Feladat |
+|---|---|
+| `gyartosor/esp32/status` | Gépállapot és termelési adatok továbbítása |
+| `gyartosor/esp32/event` | Termelési események továbbítása |
+| `gyartosor/esp32/command` | Vezérlőparancsok fogadása |
 
-## 5. A projekt felépítése
+## 7. Adatbázis
 
-A repository tervezett könyvtárszerkezete:
+A rendszer a Supabase által biztosított PostgreSQL adatbázist használja. A termelési adatok a `production_logs` táblában kerülnek tárolásra.
+
+A tábla főbb mezői:
+
+- `id`
+- `machine_status`
+- `total_produced`
+- `good_products`
+- `defective_products`
+- `last_cycle_time_ms`
+- `average_cycle_time_ms`
+- `cycle_count`
+- `recorded_at`
+
+Az adatbázis a termelési adatok későbbi lekérdezését és a webes felületen történő megjelenítését biztosítja.
+
+## 8. Webes felület és API
+
+A webes felület lehetővé teszi a gyártósor állapotának távoli megfigyelését és vezérlését.
+
+A felületen megjelennek:
+- Az aktuális gépállapot.
+- A legyártott termékek száma.
+- A megfelelő és selejtes termékek száma.
+- A termelési ciklusidőkkel kapcsolatos adatok.
+- A termelési események és a gyártási napló.
+
+A háttérprogram főbb API-végpontjai:
+
+| HTTP metódus | Végpont | Feladat |
+|---|---|---|
+| GET | `/api/status` | Aktuális gépállapot lekérdezése |
+| POST | `/api/command` | Vezérlőparancs továbbítása |
+
+A webes felület az aktuális állapotot rendszeres lekérdezéssel frissíti, a Supabase Realtime pedig az új adatbázis-bejegyzések követését támogatja.
+
+## 9. Projekt könyvtárszerkezete
+
+A repository főbb elemei:
 
 ```text
-Gyartosor_Szimulacio/
-├── GyartosorSzimulacio.ino
-├── README.md
+GyartosorSzimulacio/
+├── backend/
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── style.css
+│   │   └── app.js
+│   └── index.js
 ├── docs/
-│   └── dokumentacio.md
-└── images/
-    ├── eszkoz-felulnezet.jpg
-    └── bekotes.jpg
+├── Gyartosor_Szimulacio.ino
+├── README.md
+└── .gitignore
 ```
 
-- `GyartosorSzimulacio.ino` – az ESP32 vezérlőprogramja.
-- `README.md` – a projekt rövid bemutatása.
-- `docs/dokumentacio.md` – a projekt részletes műszaki dokumentációja.
-- `images/` – a hardverről és a bekötésről készült képek.
+- `Gyartosor_Szimulacio.ino` – az ESP32-S3 vezérlőprogramja.
+- `backend/index.js` – Node.js háttérprogram.
+- `backend/public/` – a webes felület fájljai.
+- `docs/` – projekt dokumentációja.
+- `.gitignore` – a verziókövetésből kizárt fájlok és beállítások.
+- `README.md` – a projekt bemutatása és műszaki áttekintése.
 
-A mappaszerkezet a fejlesztés során változhat.
+## 10. Fejlesztési környezet
 
-## 6. Fejlesztési környezet
+A projekt elkészítéséhez használt főbb fejlesztőeszközök:
 
 - Arduino IDE
-- C++ / Arduino framework
-- ESP32 Arduino core
-- Git és GitHub a verziókövetéshez
+- Visual Studio Code
+- Node.js
+- Eclipse Mosquitto
+- Supabase
+- Git és GitHub
 
-A további fejlesztések során a kommunikációs és webes komponensekhez szükséges eszközök és könyvtárak is bekerülnek a projektbe.
+A backend működéséhez szükséges kapcsolati és hozzáférési adatokat környezeti változók tárolják. A titkos adatokat tartalmazó `.env` fájl nem kerül verziókövetésbe.
 
-## 7. A projekt állapota
+## 11. Összefoglalás
 
-**Jelenlegi fázis:** hardveres prototípus és a gyártósor működésének szimulációja.
+A megvalósított projekt egy ESP32-S3 alapú, webes felügyeleti rendszer prototípusa, amely egyesíti a mikrokontroller-programozást, az IoT-kommunikációt, a háttérprogram-fejlesztést és az adatbázis-kezelést.
 
-A fejlesztés folyamatos. A kommunikációs réteg, az adatkezelés és a webes felügyeleti felület kialakítása a következő feladatok közé tartozik.
-
-## 8. Dokumentáció
-
-A részletes műszaki dokumentáció a [`docs/dokumentacio.md`](docs/dokumentacio.md) fájlban található.
-
+A rendszer lehetőséget biztosít a szimulált gyártási folyamat állapotának megfigyelésére, a termelési adatok tárolására és a gyártósor webes felületen keresztüli vezérlésére.
